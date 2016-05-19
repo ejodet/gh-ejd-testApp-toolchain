@@ -1,7 +1,6 @@
 import datetime
 import time
 from elasticsearch import Elasticsearch
-import logging
 from datetime import date, timedelta
 import mongoHelpers
 import matplotlib.pyplot as plt
@@ -66,8 +65,8 @@ def getTIAMCreds():
     try:
         response, content = http.request(TIAM_URL, 'POST', headers=headers)
     except Exception,e:
-        logging.info(str(e))
-        logging.error("Failed to execute query " + TIAM_URL)
+        print (str(e))
+        print ("Failed to execute query " + TIAM_URL)
         return None
     if (response.status == CREATED):
         jsonResult = json.loads(content)
@@ -134,7 +133,7 @@ def populateMongoFromES():
                 return
     
     numberOfrecords=es_activitiesColl.find().count()
-    logging.info("ES Activities Collection now has " + str(numberOfrecords) + " records")
+    print("ES Activities Collection now has " + str(numberOfrecords) + " records")
  
 def creationByDate():
     allOtcIds= es_activitiesColl.distinct("toolchain_id")
@@ -159,7 +158,7 @@ def addOneBarLabel(values1, rects1):
                 ha='center', va='bottom', alpha=opacity)
 
 def generateGraphicForFeatureByDate(aFeature):
-    logging.info("generateGraphicForFeature for " + aFeature + " feature")  
+    print("generateGraphicForFeature for " + aFeature + " feature")  
     if (aFeature == "creationsByDate"):
         theDict= otcCreationByDate
         theTitle= "Toolchains created, by date"
@@ -211,15 +210,15 @@ def generateGraphicForFeatureByDate(aFeature):
         fileName= aFeature + ".png"
         plt.savefig(fileName, dpi=60, format='png', bbox_inches='tight')
         plt.close()
-        logging.info("Saved graph " + fileName)
+        print("Saved graph " + fileName)
     except Exception,e:
-        logging.error("Failed to generate chart for " + aFeature + " feature")
-        logging.error(str(e))
+        print("Failed to generate chart for " + aFeature + " feature")
+        print(str(e))
         # don't fail
         pass
     
 def generateGroupedGraphicForActivitiesByDate(uniqueToolChains):
-    logging.info("generateGraphicForFeature for tool chain lifecycle events")  
+    print("generateGraphicForFeature for tool chain lifecycle events")  
     
     try:
         width = 0.27 
@@ -289,15 +288,15 @@ def generateGroupedGraphicForActivitiesByDate(uniqueToolChains):
         # plt.show()
         plt.savefig(fileName, dpi=60, format='png', bbox_inches='tight')
         plt.close()
-        logging.info("Saved graph " + fileName)
+        print("Saved graph " + fileName)
     except Exception,e:
-        logging.error("Failed to generate chart for tool chain lifecycle events")
-        logging.error(str(e))
+        print("Failed to generate chart for tool chain lifecycle events")
+        print(str(e))
         # don't fail
         pass
    
 def generateGroupedGraphicForBindEventsByDate():
-    logging.info("generateGraphicForFeature for tool chain bind events")  
+    print("generateGraphicForFeature for tool chain bind events")  
     
     try:  
         N = len(bindEventForToolsByDate)
@@ -368,15 +367,15 @@ def generateGroupedGraphicForBindEventsByDate():
         fileName= "toolsBindEvents_grouped.png"
         plt.savefig(fileName, dpi=60, format='png', bbox_inches='tight')
         plt.close()
-        logging.info("Saved graph " + fileName)
+        print("Saved graph " + fileName)
     except Exception,e:
-        logging.error("Failed to generate chart for tool chain bind events")  
-        logging.error(str(e))
+        print("Failed to generate chart for tool chain bind events")  
+        print(str(e))
         # don't fail
         pass
    
 def generateStackedGraphicForActivitiesByDate():
-    logging.info("generateGraphicForFeature for tool chain lifecycle events")  
+    print("generateGraphicForFeature for tool chain lifecycle events")  
     
     try:  
         N = len(bindActivityByDate)
@@ -426,10 +425,10 @@ def generateStackedGraphicForActivitiesByDate():
         fileName= "toolChainLifeCycleEvents_stacked.png"
         plt.savefig(fileName, dpi=60, format='png', bbox_inches='tight')
         plt.close()
-        logging.info("Saved graph " + fileName)
+        print("Saved graph " + fileName)
     except Exception,e:
-        logging.error("Failed to generate chart for tool chain lifecycle events")
-        logging.error(str(e))
+        print("Failed to generate chart for tool chain lifecycle events")
+        print(str(e))
         # don't fail
         pass
     
@@ -543,8 +542,8 @@ def executeOTCQuery(queryURL, target_credentials):
     try:
         response, content = http.request(queryURL, 'GET', headers=headers)
     except Exception,e:
-        logging.info(str(e))
-        logging.error("Failed to execute query " + queryURL)
+        print(str(e))
+        print("Failed to execute query " + queryURL)
         raise
     if (response.status == OK):
         jsonResult = json.loads(content)
@@ -556,13 +555,14 @@ def executeOTCQuery(queryURL, target_credentials):
         
 def populateToolChainsCollection():
     allOtcIds= es_activitiesColl.distinct("toolchain_id")
+    print "Found " + str(allOtcIds) + " OTC Ids in Mongo Collection"
     # counters
     everCreated= len(allOtcIds)
     retained= 0
     deleted= 0
     target_credentials= getTIAMCreds()
     if (target_credentials == None):
-        logging.error("Failed to create TIAM target credentials - aborting populateToolChainsCollection()")
+        print("Failed to create TIAM target credentials - aborting populateToolChainsCollection()")
         return
     
     headers.clear()
@@ -576,29 +576,28 @@ def populateToolChainsCollection():
                 for aToolChain in toolChains:
                     retained +=1
                     allToolChains.append(aToolChain)
-                    print anOtcId
             else:
                 deleted +=1
     except:
         # something went wrong - exit for now
         return
     # we're safe to clear and re-populate the collection
-    logging.info("OTC API calls completed:")
-    logging.info("    Number of tool chains ever: " + str(everCreated))
-    logging.info("    Retained tool chains: " + str(retained))
-    logging.info("    Deleted tool chains: " + str(deleted) + "\n")
+    print("OTC API calls completed:")
+    print("    Number of tool chains ever: " + str(everCreated))
+    print("    Retained tool chains: " + str(retained))
+    print("    Deleted tool chains: " + str(deleted) + "\n")
     
     if (len(allToolChains) == 0):
         # unexpected - don't clear the collection
-        logging.error("No information fetched from APIs - aborting populateToolChainsCollection()")
+        print("No information fetched from APIs - aborting populateToolChainsCollection()")
         return
     
     # clear the collection
-    logging.info("Clearing tool chains collection")
+    print("Clearing tool chains collection")
     es_toolChainsColl.remove({}) 
     
     # insert all records
-    logging.info("Inserting" + str(retained) + " retained tool chains")
+    print("Inserting" + str(retained) + " retained tool chains")
     try: 
         es_toolChainsColl.insert(allToolChains,  check_keys= False)
     except:
@@ -606,11 +605,10 @@ def populateToolChainsCollection():
         return
       
 def main():
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
     jobStartTime= time.time()
-    logging.info("Starting OTC ES v2 data analysis")
+    print("Starting OTC ES v2 data analysis")
     try:
-        populateMongoFromES()
+        # populateMongoFromES()
         populateToolChainsCollection()
         bindEventsForTools()
         activitiesForUniqueToolsChainsByDate()
@@ -618,12 +616,12 @@ def main():
         creationByDate()
         
     except Exception,e:
-        logging.info(str(e))
+        print(str(e))
         #mailNotifier.notifyFailure("testOTC", e)
         raise
     
     jobElapsed= time.time() - jobStartTime
-    logging.info("OTC data collection completed in " + str(jobElapsed) + " ms")
+    print("OTC data collection completed in " + str(jobElapsed) + " ms")
     
 
 if __name__ == "__main__":
