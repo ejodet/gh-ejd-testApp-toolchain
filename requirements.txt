@@ -1,3 +1,4 @@
 pymongo==3.2.2
 elasticsearch>=2.0.0,<3.0.0
 matplotlib
+httplib2
