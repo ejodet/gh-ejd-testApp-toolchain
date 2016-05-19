@@ -17,3 +17,8 @@ def connectToMongo():
     db = client.get_default_database() 
     logging.info ('connected to mongodb!')  
     return db
+
+def connectToLocalMongo():
+    client = pymongo.MongoClient()
+    db = client["otc"]
+    return db

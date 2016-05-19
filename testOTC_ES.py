@@ -6,19 +6,26 @@ from datetime import date, timedelta
 import mongoHelpers
 import matplotlib.pyplot as plt
 import numpy as np
-import os
+import base64
+import httplib2
+import json
+
+OK= 200
+PROJECT_NOT_FOUND= 404
+CREATED= 201
+CONTENT_TYPE= 'Content-type'
+FORM_URL= 'application/x-www-form-urlencoded'
 
 allDates= []
 ES_HOST= 'https://sl-us-dal-9-portal1.dblayer.com:10357'
 
 # MongoDB
 db= mongoHelpers.connectToMongo()
-# db= mongoHelpers.connectToMongo_production()
-# db= mongoHelpers.connectToMongo_P00_production()
+# db= mongoHelpers.connectToLocalMongo()
 
 # storageService= objectStorageHelper.connect()
 
-IMG_PATH= "/static/images/"
+# IMG_PATH= "/static/images/"
 # IMG_PATH =  "c:/temp/data/png/"
 
 es_activitiesColl= db["es_activities"]
@@ -36,6 +43,37 @@ provisionActivityForUniqueToolChainByDate= {}
 bindEventForToolsByDate= {}
 
 colors=["greenyellow", "blue", "orangered", "mediumaquamarine","dodgerblue",  "orchid", "magenta", "yellow", "green"]
+
+# API query
+OTC_URL_START= "https://devops-api.stage1.ng.bluemix.net/v1/toolchains/"
+OTC_URL_END= "?include=everything"
+
+# fabric test user for YS1
+FABRIC_USER= "test"
+FABRIC_PWD= "72heYpy2weRih8I3KTxdMVOy90bBpQB0WDY3fH2IixOaAtwnRU"
+
+# TIAM
+TIAM_URL= "https://devops-api.stage1.ng.bluemix.net/v1/identity/service/manage/credentials"
+
+http = httplib2.Http() 
+headers= {}
+
+def getTIAMCreds():
+    headers.clear()
+    base64string = base64.encodestring('%s:%s' % (FABRIC_USER, FABRIC_PWD))[:-1]
+    headers['Content-Length']= "0"
+    headers['Authorization']= 'Basic %s' % base64string
+    try:
+        response, content = http.request(TIAM_URL, 'POST', headers=headers)
+    except Exception,e:
+        logging.info(str(e))
+        logging.error("Failed to execute query " + TIAM_URL)
+        return None
+    if (response.status == CREATED):
+        jsonResult = json.loads(content)
+        return jsonResult["target_credentials"]
+    else:
+        return None
 
 def queryES(docType, startDate, endDate):
     # use port 10358 for YS1, 10357 for YP
@@ -171,7 +209,7 @@ def generateGraphicForFeatureByDate(aFeature):
         plt.subplots_adjust(bottom= 0.15)
         # plt.show()
         fileName= aFeature + ".png"
-        plt.savefig(os.path.join(IMG_PATH, fileName), dpi=60, format='png', bbox_inches='tight')
+        plt.savefig(fileName, dpi=60, format='png', bbox_inches='tight')
         plt.close()
         logging.info("Saved graph " + fileName)
     except Exception,e:
@@ -249,7 +287,7 @@ def generateGroupedGraphicForActivitiesByDate(uniqueToolChains):
         plt.subplots_adjust(bottom= 0.15)
         plt.legend( (p1[0], p2[0], p3[0]), ('provision', 'bind', 'unbind') , loc="best", handlelength=1, fontsize=12)
         # plt.show()
-        plt.savefig(os.path.join(IMG_PATH, fileName), dpi=60, format='png', bbox_inches='tight')
+        plt.savefig(fileName, dpi=60, format='png', bbox_inches='tight')
         plt.close()
         logging.info("Saved graph " + fileName)
     except Exception,e:
@@ -386,7 +424,7 @@ def generateStackedGraphicForActivitiesByDate():
         plt.legend( (p1[0], p2[0], p3[0]), ('unbind', 'provision', 'bind') , loc="best", handlelength=1, fontsize=12)
         # plt.show()
         fileName= "toolChainLifeCycleEvents_stacked.png"
-        plt.savefig(os.path.join(IMG_PATH, fileName), dpi=60, format='png', bbox_inches='tight')
+        plt.savefig(fileName, dpi=60, format='png', bbox_inches='tight')
         plt.close()
         logging.info("Saved graph " + fileName)
     except Exception,e:
@@ -497,13 +535,83 @@ def saveToStorageService(containerName, fileName):
     with open(fileName, 'w') as example_file:
         storageService.put_object(containerName, fileName, contents= "", content_type='text/plain')
     print "nFile %s saved successfully." % fileName
-"""       
+"""     
+def executeOTCQuery(queryURL, target_credentials):
+    # use otc api to fetch otc details / composition - http://otc-swagger.stage1.ng.bluemix.net/otc-api/swagger/#!/toolchains/getToolchains
+    headers[CONTENT_TYPE]= FORM_URL
+    headers['Authorization']= 'Basic %s' % target_credentials
+    try:
+        response, content = http.request(queryURL, 'GET', headers=headers)
+    except Exception,e:
+        logging.info(str(e))
+        logging.error("Failed to execute query " + queryURL)
+        raise
+    if (response.status == OK):
+        jsonResult = json.loads(content)
+        return jsonResult
+    elif (response.status == PROJECT_NOT_FOUND):
+        return None
+    else:
+        print response
+        
+def populateToolChainsCollection():
+    allOtcIds= es_activitiesColl.distinct("toolchain_id")
+    # counters
+    everCreated= len(allOtcIds)
+    retained= 0
+    deleted= 0
+    target_credentials= getTIAMCreds()
+    if (target_credentials == None):
+        logging.error("Failed to create TIAM target credentials - aborting populateToolChainsCollection()")
+        return
+    
+    headers.clear()
+    try:
+        allToolChains= []
+        for anOtcId in allOtcIds: 
+            otcUrl= OTC_URL_START + anOtcId + OTC_URL_END
+            toolChainsList= executeOTCQuery(otcUrl, target_credentials)
+            if (toolChainsList != None):
+                toolChains= toolChainsList["items"]
+                for aToolChain in toolChains:
+                    retained +=1
+                    allToolChains.append(aToolChain)
+                    print anOtcId
+            else:
+                deleted +=1
+    except:
+        # something went wrong - exit for now
+        return
+    # we're safe to clear and re-populate the collection
+    logging.info("OTC API calls completed:")
+    logging.info("    Number of tool chains ever: " + str(everCreated))
+    logging.info("    Retained tool chains: " + str(retained))
+    logging.info("    Deleted tool chains: " + str(deleted) + "\n")
+    
+    if (len(allToolChains) == 0):
+        # unexpected - don't clear the collection
+        logging.error("No information fetched from APIs - aborting populateToolChainsCollection()")
+        return
+    
+    # clear the collection
+    logging.info("Clearing tool chains collection")
+    es_toolChainsColl.remove({}) 
+    
+    # insert all records
+    logging.info("Inserting" + str(retained) + " retained tool chains")
+    try: 
+        es_toolChainsColl.insert(allToolChains,  check_keys= False)
+    except:
+        print "toot"
+        return
+      
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
     jobStartTime= time.time()
     logging.info("Starting OTC ES v2 data analysis")
     try:
         # populateMongoFromES()
+        populateToolChainsCollection()
         bindEventsForTools()
         activitiesForUniqueToolsChainsByDate()
         activitiesByDate()
