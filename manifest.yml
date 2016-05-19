@@ -1,0 +1,9 @@
+applications:
+- path: .
+  memory: 128M
+  instances: 1
+  name: gh-ejd-testApp
+  disk_quota: 1024M
+  services:
+  - mongodb-qo
+  command: python test.py
