@@ -606,7 +606,7 @@ def populateToolChainsCollection():
         return
       
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s:%(name)s:%(message)s")
     jobStartTime= time.time()
     logging.info("Starting OTC ES v2 data analysis")
     try:
