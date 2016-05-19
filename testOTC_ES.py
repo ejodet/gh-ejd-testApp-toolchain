@@ -17,7 +17,7 @@ CONTENT_TYPE= 'Content-type'
 FORM_URL= 'application/x-www-form-urlencoded'
 
 allDates= []
-ES_HOST= 'https://sl-us-dal-9-portal1.dblayer.com:10357'
+ES_HOST= 'https://sl-us-dal-9-portal1.dblayer.com:10358'
 
 # MongoDB
 db= mongoHelpers.connectToMongo()
@@ -610,7 +610,7 @@ def main():
     jobStartTime= time.time()
     logging.info("Starting OTC ES v2 data analysis")
     try:
-        # populateMongoFromES()
+        populateMongoFromES()
         populateToolChainsCollection()
         bindEventsForTools()
         activitiesForUniqueToolsChainsByDate()
